@@ -32,12 +32,16 @@ public class HeadsetBroadcastReceiver extends BroadcastReceiver {
                     Log.d(TAG, "I have no idea what the headset state is");
             }
         } else if (intent.getAction().equals(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)) {
+            Log.d(TAG, "Headset: ACTION_CONNECTION_STATE_CHANGED");
             int connectionState = intent.getExtras().getInt(BluetoothAdapter.EXTRA_CONNECTION_STATE);
+            Log.d(TAG, "Headset: connectionState: " + connectionState);
             switch (connectionState) {
                 case BluetoothAdapter.STATE_CONNECTED:
+                    Log.d(TAG, "Headset: connectionState:STATE_CONNECTED");
                     headsetEventListener.onHeadsetConnect();
                     break;
                 case BluetoothAdapter.STATE_DISCONNECTED:
+                    Log.d(TAG, "Headset: connectionState:STATE_DISCONNECTED");
                     headsetEventListener.onHeadsetDisconnect();
                     break;
                 default:
