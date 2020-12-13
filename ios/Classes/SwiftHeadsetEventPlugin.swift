@@ -6,6 +6,8 @@ import AVFoundation
 public class SwiftHeadsetEventPlugin: NSObject, FlutterPlugin {
     
     var channel : FlutterMethodChannel?
+    var bluetoothHeadsetConnectedState = false;
+    var wiredHeadsetConnectedState = false;
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter.moum/headset_event", binaryMessenger: registrar.messenger())
@@ -16,56 +18,82 @@ public class SwiftHeadsetEventPlugin: NSObject, FlutterPlugin {
         
     }
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        if (call.method == "getPlatformVersion"){
-            result("iOS " + UIDevice.current.systemVersion)
-        }else if (call.method == "getCurrentState"){
-            result(HeadsetIsConnect())
+        if (call.method == "getCurrentState"){
+            result(getCurrentState())
         }
     }
     
     public override init() {
         super.init()
-        registerAudioRouteChangeBlock()
-        
+        initHeadsetListener()
+        let currentRoute = AVAudioSession.sharedInstance().currentRoute
+        for output in currentRoute.outputs {
+            let portType = output.portType
+            if (portType == AVAudioSession.Port.headphones) {
+                self.channel!.invokeMethod("connectWired",arguments: "true")
+                wiredHeadsetConnectedState = true
+            }else if (portType == AVAudioSession.Port.bluetoothA2DP || portType == AVAudioSession.Port.bluetoothHFP) {
+                self.channel!.invokeMethod("connectBluetooth",arguments: "true")
+                bluetoothHeadsetConnectedState = true
+            }
+        }
     }
     
-    
-    // AVAudioSessionRouteChange notification is Detaction Headphone connection status
-    //(https://developer.apple.com/documentation/avfoundation/avaudiosession/responding_to_audio_session_route_changes)
-    // When the AVAudioSessionRouteChange is called from notification center , the blcoking code detect the headphone connection.
-    // Regular notification center work on the main UI thread but in this case it works on a particular thread.
-    // So we should using blcoking.
-    /////////////////////////////////////////////////////////////
-    func registerAudioRouteChangeBlock(){
-        
+    func initHeadsetListener(){
         NotificationCenter.default.addObserver( forName:AVAudioSession.routeChangeNotification, object: AVAudioSession.sharedInstance(), queue: nil) { notification in
             guard let userInfo = notification.userInfo,
-                let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
-                let reason = AVAudioSession.RouteChangeReason(rawValue:reasonValue) else {
-                    return
+                  let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue:reasonValue) else {
+                return
             }
+            print(reason);
             switch reason {
             case .newDeviceAvailable:
-                self.channel!.invokeMethod("connect",arguments: "true")
+                let session = AVAudioSession.sharedInstance()
+                do {
+                    try session.setActive(true)
+                }
+                catch {
+                    print("Unexpected error: \(error).")
+                }
+                for output in session.currentRoute.outputs where output.portType == AVAudioSession.Port.headphones {
+                    self.channel!.invokeMethod("connectWired",arguments: "true")
+                    self.wiredHeadsetConnectedState = true
+                    break
+                }
+                for output in session.currentRoute.outputs where (output.portType == AVAudioSession.Port.bluetoothA2DP || output.portType == AVAudioSession.Port.bluetoothHFP) {
+                    self.channel!.invokeMethod("connectBluetooth",arguments: "true")
+                    self.bluetoothHeadsetConnectedState = true
+                    break
+                }
             case .oldDeviceUnavailable:
-                self.channel!.invokeMethod("disconnect",arguments: "true")
+                if let previousRoute =
+                    userInfo[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription {
+                    for output in previousRoute.outputs where output.portType == AVAudioSession.Port.headphones {
+                        self.channel!.invokeMethod("disconnectWired",arguments: "true")
+                        self.wiredHeadsetConnectedState = false
+                        break
+                    }
+                    for output in previousRoute.outputs where (output.portType == AVAudioSession.Port.bluetoothA2DP || output.portType == AVAudioSession.Port.bluetoothHFP) {
+                        self.channel!.invokeMethod("disconnectBluetooth",arguments: "true")
+                        self.bluetoothHeadsetConnectedState = false
+                        break
+                    }
+                }
             default: ()
             }
         }
     }
     
-    func HeadsetIsConnect() -> Int  {
-        let currentRoute = AVAudioSession.sharedInstance().currentRoute
-        for output in currentRoute.outputs {
-            let portType = output.portType
-            if (portType == AVAudioSession.Port.headphones ||
-                portType == AVAudioSession.Port.bluetoothHFP ||
-                portType == AVAudioSession.Port.bluetoothA2DP) {
-                return 1
-            }else {
-                return 0
-            }
+    func getCurrentState() -> Int  {
+        var currentState = 0
+        if (bluetoothHeadsetConnectedState && wiredHeadsetConnectedState) {
+            currentState = 3
+        } else if (bluetoothHeadsetConnectedState) {
+            currentState = 2
+        } else if (wiredHeadsetConnectedState) {
+            currentState = 1
         }
-        return 0
+        return currentState;
     }
 }

@@ -10,23 +10,37 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   HeadsetEvent headsetPlugin = new HeadsetEvent();
-  HeadsetState headsetEvent;
+  WiredHeadsetState wiredHeadsetEvent;
+  BluetoothHeadsetState bluetoothHeadsetEvent;
+  CurrentHeadsetState currentHeadsetState;
 
   @override
   void initState() {
     super.initState();
 
-    /// if headset is plugged
-    headsetPlugin.getCurrentState.then((_val) {
-      setState(() {
-        headsetEvent = _val;
-      });
-    });
+    /// check one time, if headset is plugged
+    updateCurrentState();
 
     /// Detect the moment headset is plugged or unplugged
-    headsetPlugin.setListener((_val) {
+    headsetPlugin.setBluetoothSetListener((_val) {
+      updateCurrentState();
       setState(() {
-        headsetEvent = _val;
+        bluetoothHeadsetEvent = _val;
+      });
+    });
+    
+    headsetPlugin.setWiredHeadSetListener((_val) {
+      updateCurrentState();
+      setState(() {
+        wiredHeadsetEvent = _val;
+      });
+    });
+  }
+
+  void updateCurrentState() {
+    headsetPlugin.getCurrentState.then((_val) {
+      setState(() {
+        currentHeadsetState = _val;
       });
     });
   }
@@ -36,19 +50,31 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Headset Event Plugin'),
+          title: const Text('Better Headset Event Plugin'),
         ),
         body: Center(
-            child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.max,
           children: <Widget>[
-            Icon(
-              Icons.headset,
-              color: this.headsetEvent == HeadsetState.CONNECT ? Colors.green : Colors.red,
-            ),
-            Text('State : $headsetEvent\n'),
+              Text(
+                'currentHeadsetState:\n$currentHeadsetState\n',
+                textAlign: TextAlign.left,
+              ),
+              Text(
+                'wiredHeadsetEvent:\n$wiredHeadsetEvent\n',
+                textAlign: TextAlign.left,
+              ),
+              Text(
+                'bluetoothHeadsetEvent:\n$bluetoothHeadsetEvent\n',
+                textAlign: TextAlign.left,
+              ),
           ],
-        )),
+        ),
+            )),
       ),
     );
   }
