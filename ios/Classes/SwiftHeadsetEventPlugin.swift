@@ -12,9 +12,10 @@ public class SwiftHeadsetEventPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter.moum/headset_event", binaryMessenger: registrar.messenger())
         let instance = SwiftHeadsetEventPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
-        
+
         instance.channel = channel
+        instance.setup()
+        registrar.addMethodCallDelegate(instance, channel: channel)
         
     }
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -22,9 +23,8 @@ public class SwiftHeadsetEventPlugin: NSObject, FlutterPlugin {
             result(getCurrentState())
         }
     }
-    
-    public override init() {
-        super.init()
+
+    func setup() {
         initHeadsetListener()
         let currentRoute = AVAudioSession.sharedInstance().currentRoute
         for output in currentRoute.outputs {
